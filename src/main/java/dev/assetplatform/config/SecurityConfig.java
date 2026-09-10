@@ -32,7 +32,7 @@ public class SecurityConfig {
       throw new IllegalArgumentException("JWT_SECRET must encode at least 32 random bytes");
     if (props.tokenTtl().isNegative()
         || props.tokenTtl().isZero()
-        || props.tokenTtl().toMinutes() > 30) {
+        || props.tokenTtl().compareTo(java.time.Duration.ofMinutes(30)) > 0) {
       throw new IllegalArgumentException("Token TTL must be positive and at most 30 minutes");
     }
     return new SecretKeySpec(bytes, "HmacSHA256");
@@ -93,7 +93,7 @@ public class SecurityConfig {
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                     .permitAll()
                     .requestMatchers("/actuator/prometheus")
-                    .authenticated()
+                    .hasAuthority("SCOPE_metrics.read")
                     .requestMatchers("/actuator/**")
                     .denyAll()
                     .anyRequest()

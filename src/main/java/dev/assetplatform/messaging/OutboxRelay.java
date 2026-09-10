@@ -13,6 +13,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Component
@@ -54,6 +56,7 @@ public class OutboxRelay {
         /* bounded drain */
       }
     } catch (RuntimeException ex) {
+      metrics.counter("asset.outbox.transaction.failures").increment();
       LOG.warn("outbox_transaction_failed type={}", ex.getClass().getSimpleName());
     }
   }
@@ -88,7 +91,7 @@ public class OutboxRelay {
           "update outbox_events set attempts = attempts + 1, available_at = ? where id = ?",
           Timestamp.from(Instant.now().plusSeconds(delay)),
           id);
-      metrics.counter("asset.outbox.publish", "result", "retry").increment();
+      countAfterCommit("retry");
       LOG.warn(
           "outbox_publish_failed eventId={} attempt={} type={}",
           id,
@@ -98,7 +101,17 @@ public class OutboxRelay {
     }
     jdbc.update(
         "update outbox_events set published_at = now(), attempts = attempts + 1 where id = ?", id);
-    metrics.counter("asset.outbox.publish", "result", "acknowledged").increment();
+    countAfterCommit("acknowledged");
     return true;
+  }
+
+  private void countAfterCommit(String result) {
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCommit() {
+            metrics.counter("asset.outbox.publish", "result", result).increment();
+          }
+        });
   }
 }

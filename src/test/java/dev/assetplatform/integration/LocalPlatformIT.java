@@ -29,6 +29,25 @@ class LocalPlatformIT extends PlatformContract {
     when(limiter.allow(anyString(), anyBoolean())).thenReturn(true);
   }
 
+  @org.junit.jupiter.api.Test
+  void httpEncodedLoginCannotBypassRateLimiter() throws Exception {
+    when(limiter.allow(anyString(), eq(true))).thenReturn(false);
+    when(limiter.retryAfterSeconds()).thenReturn(60L);
+    try (var client = java.net.http.HttpClient.newHttpClient()) {
+      var request =
+          java.net.http.HttpRequest.newBuilder(
+                  java.net.URI.create("http://127.0.0.1:" + port + "/api/v1/auth/%6cogin"))
+              .header("Content-Type", "application/json")
+              .timeout(java.time.Duration.ofSeconds(10))
+              .POST(java.net.http.HttpRequest.BodyPublishers.ofString("{}"))
+              .build();
+      var response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+      org.assertj.core.api.Assertions.assertThat(response.statusCode()).isEqualTo(429);
+      org.assertj.core.api.Assertions.assertThat(response.body()).contains("RATE_LIMITED");
+      verify(limiter).allow(anyString(), eq(true));
+    }
+  }
+
   @DynamicPropertySource
   static void config(DynamicPropertyRegistry registry) {
     registry.add("spring.datasource.url", () -> System.getenv("TEST_DATABASE_URL"));

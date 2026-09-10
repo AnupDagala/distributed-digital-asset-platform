@@ -35,7 +35,9 @@ public class AssetInspector {
     try (var object = storage.materialize(asset.getStorageKey(), props.maxFileBytes())) {
       Path path = object.path();
       StreamingPatternMatcher eof =
-          new StreamingPatternMatcher("%%EOF".getBytes(StandardCharsets.US_ASCII));
+          asset.getMediaType().equals("application/pdf")
+              ? new StreamingPatternMatcher("%%EOF".getBytes(StandardCharsets.US_ASCII))
+              : null;
       MessageDigest digest = sha256();
       try (InputStream input = Files.newInputStream(path)) {
         byte[] first = input.readNBytes(16);
@@ -45,19 +47,19 @@ public class AssetInspector {
           throw new RejectedAssetException("SIGNATURE_MISMATCH");
         }
         digest.update(first);
-        eof.accept(first, 0, first.length);
+        if (eof != null) eof.accept(first, 0, first.length);
         byte[] buffer = new byte[8192];
         int count;
         while ((count = input.read(buffer)) != -1) {
           digest.update(buffer, 0, count);
-          eof.accept(buffer, 0, count);
+          if (eof != null) eof.accept(buffer, 0, count);
         }
       }
       if (Files.size(path) != asset.getFileSize()
           || !MessageDigest.isEqual(digest.digest(), HexFormat.of().parseHex(asset.getSha256()))) {
         throw new RejectedAssetException("CONTENT_INTEGRITY_MISMATCH");
       }
-      if (asset.getMediaType().equals("application/pdf")) {
+      if (eof != null) {
         if (!eof.endsWithin(1024)) throw new RejectedAssetException("INVALID_PDF_EOF");
         return pdf(asset.getId(), path);
       }

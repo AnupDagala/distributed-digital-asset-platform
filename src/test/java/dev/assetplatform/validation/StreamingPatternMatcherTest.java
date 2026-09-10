@@ -12,6 +12,49 @@ class StreamingPatternMatcherTest {
   }
 
   @Test
+  void pdfTrailerBoundaryIsInclusiveAndPatternIsDefensivelyCopied() {
+    byte[] pattern = bytes("%%EOF");
+    StreamingPatternMatcher matcher = new StreamingPatternMatcher(pattern);
+    pattern[0] = '!';
+    byte[] marker = bytes("x%%EOF");
+    matcher.accept(marker, 1, 5);
+    matcher.accept(new byte[1024], 0, 1024);
+    assertThat(matcher.endsWithin(1024)).isTrue();
+    matcher.accept(new byte[1], 0, 1);
+    assertThat(matcher.endsWithin(1024)).isFalse();
+    assertThat(matcher.endsWithin(-1)).isFalse();
+    assertThatThrownBy(() -> matcher.accept(marker, -1, 2))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> matcher.accept(marker, 1, marker.length))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+  }
+
+  @Test
+  void binaryPatternsMatchReferenceAcrossArbitraryPartitions() {
+    Random random = new Random(90910);
+    for (int sample = 0; sample < 300; sample++) {
+      byte[] pattern = new byte[1 + random.nextInt(16)], data = new byte[random.nextInt(300)];
+      for (int i = 0; i < pattern.length; i++) pattern[i] = (byte) (128 + random.nextInt(4));
+      for (int i = 0; i < data.length; i++) data[i] = (byte) (128 + random.nextInt(4));
+      if (data.length >= pattern.length && sample % 2 == 0)
+        System.arraycopy(
+            pattern, 0, data, random.nextInt(data.length - pattern.length + 1), pattern.length);
+      long expected = -1;
+      for (int i = 0; i <= data.length - pattern.length; i++) {
+        if (java.util.Arrays.equals(pattern, 0, pattern.length, data, i, i + pattern.length))
+          expected = i + pattern.length;
+      }
+      StreamingPatternMatcher matcher = new StreamingPatternMatcher(pattern);
+      for (int offset = 0; offset < data.length; ) {
+        int length = Math.min(1 + random.nextInt(19), data.length - offset);
+        matcher.accept(data, offset, length);
+        offset += length;
+      }
+      assertThat(matcher.lastMatchEnd()).as("sample %s", sample).isEqualTo(expected);
+    }
+  }
+
+  @Test
   void handlesChunkBoundariesAndOverlaps() {
     StreamingPatternMatcher matcher = new StreamingPatternMatcher(bytes("ababa"));
     matcher.accept(bytes("xxaba"), 0, 5);

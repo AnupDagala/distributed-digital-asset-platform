@@ -24,10 +24,9 @@ public record PlatformProperties(
     @Min(1) long maxImagePixels) {
   public PlatformProperties {
     if (rateWindow != null
-        && (rateWindow.isZero()
-            || rateWindow.isNegative()
+        && (rateWindow.compareTo(Duration.ofMillis(1)) < 0
             || rateWindow.compareTo(Duration.ofHours(1)) > 0)) {
-      throw new IllegalArgumentException("Rate window must be positive and at most one hour");
+      throw new IllegalArgumentException("Rate window must be at least 1 ms and at most one hour");
     }
   }
 }

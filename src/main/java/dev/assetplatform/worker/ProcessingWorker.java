@@ -11,13 +11,13 @@ import org.springframework.stereotype.Component;
 public class ProcessingWorker {
   private static final Logger LOG = LoggerFactory.getLogger(ProcessingWorker.class);
   private final EventCodec codec;
-  private final ProcessingTransactions transactions;
+  private final ProcessingCoordinator coordinator;
   private final MeterRegistry metrics;
 
   public ProcessingWorker(
-      EventCodec codec, ProcessingTransactions transactions, MeterRegistry metrics) {
+      EventCodec codec, ProcessingCoordinator coordinator, MeterRegistry metrics) {
     this.codec = codec;
-    this.transactions = transactions;
+    this.coordinator = coordinator;
     this.metrics = metrics;
   }
 
@@ -27,7 +27,7 @@ public class ProcessingWorker {
     if (!event.assetId().toString().equals(record.key())) throw new InvalidEventException();
     Timer.Sample duration = Timer.start(metrics);
     try {
-      if (transactions.start(event)) transactions.process(event);
+      coordinator.handle(event);
       LOG.info(
           "processing_delivery_handled eventId={} assetId={}", event.eventId(), event.assetId());
     } finally {

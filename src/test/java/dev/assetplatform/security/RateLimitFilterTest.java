@@ -26,6 +26,41 @@ class RateLimitFilterTest {
   }
 
   @Test
+  void encodedLoginPathCannotBypassAuthQuota() throws Exception {
+    var req = new MockHttpServletRequest("POST", "/platform/api/v1/auth/%6cogin");
+    req.setContextPath("/platform");
+    req.setServletPath("/api/v1/auth/login");
+    var res = new MockHttpServletResponse();
+    filter.doFilter(req, res, new MockFilterChain());
+    verify(limiter).allow(req.getRemoteAddr(), true);
+    assertThat(res.getStatus()).isEqualTo(429);
+  }
+
+  @Test
+  void contextPathDoesNotBypassAuthQuota() throws Exception {
+    var req = new MockHttpServletRequest("POST", "/platform/api/v1/auth/login");
+    req.setContextPath("/platform");
+    var res = new MockHttpServletResponse();
+    var chain = new MockFilterChain();
+    filter.doFilter(req, res, chain);
+    verify(limiter).allow(req.getRemoteAddr(), true);
+    assertThat(res.getStatus()).isEqualTo(429);
+    assertThat(chain.getRequest()).isNull();
+  }
+
+  @Test
+  void contextPathDoesNotBypassSignedUserQuota() throws Exception {
+    SecurityContextHolder.getContext()
+        .setAuthentication(new UsernamePasswordAuthenticationToken("owner", null, List.of()));
+    var req = new MockHttpServletRequest("GET", "/platform/api/v1/assets");
+    req.setContextPath("/platform");
+    var res = new MockHttpServletResponse();
+    filter.doFilter(req, res, new MockFilterChain());
+    verify(limiter).allow("owner", false);
+    assertThat(res.getStatus()).isEqualTo(429);
+  }
+
+  @Test
   void deniesExceededQuotaWithRetryHeader() throws Exception {
     when(limiter.retryAfterSeconds()).thenReturn(60L);
     var req = new MockHttpServletRequest("POST", "/api/v1/auth/login");

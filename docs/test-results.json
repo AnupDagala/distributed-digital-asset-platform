@@ -1,21 +1,33 @@
 {
   "command": "mvn clean verify",
   "build": "SUCCESS",
-  "discovered": 78.0,
-  "passed": 59.0,
-  "failed": 0.0,
-  "skipped": 19.0,
+  "verifiedAt": "2026-09-10T17:06:57Z",
+  "discovered": 113,
+  "passed": 83,
+  "failed": 0,
+  "errors": 0,
+  "skipped": 30,
   "suites": [
+    {
+      "suite": "dev.assetplatform.config.SecurityConfigTest",
+      "tests": 2,
+      "passed": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
     {
       "suite": "dev.assetplatform.domain.AssetTest",
       "tests": 4,
+      "passed": 4,
       "failures": 0,
       "errors": 0,
       "skipped": 0
     },
     {
       "suite": "dev.assetplatform.messaging.DeadLetterRecoveryTest",
-      "tests": 3,
+      "tests": 5,
+      "passed": 5,
       "failures": 0,
       "errors": 0,
       "skipped": 0
@@ -23,6 +35,15 @@
     {
       "suite": "dev.assetplatform.messaging.EventCodecTest",
       "tests": 7,
+      "passed": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "dev.assetplatform.security.BodyLimitFilterTest",
+      "tests": 3,
+      "passed": 3,
       "failures": 0,
       "errors": 0,
       "skipped": 0
@@ -30,13 +51,15 @@
     {
       "suite": "dev.assetplatform.security.OwnershipTest",
       "tests": 1,
+      "passed": 1,
       "failures": 0,
       "errors": 0,
       "skipped": 0
     },
     {
       "suite": "dev.assetplatform.security.RateLimitFilterTest",
-      "tests": 3,
+      "tests": 6,
+      "passed": 6,
       "failures": 0,
       "errors": 0,
       "skipped": 0
@@ -44,6 +67,7 @@
     {
       "suite": "dev.assetplatform.storage.LocalObjectStorageTest",
       "tests": 3,
+      "passed": 3,
       "failures": 0,
       "errors": 0,
       "skipped": 0
@@ -51,13 +75,15 @@
     {
       "suite": "dev.assetplatform.validation.FileValidatorTest",
       "tests": 12,
+      "passed": 12,
       "failures": 0,
       "errors": 0,
       "skipped": 0
     },
     {
       "suite": "dev.assetplatform.validation.StreamingPatternMatcherTest",
-      "tests": 3,
+      "tests": 5,
+      "passed": 5,
       "failures": 0,
       "errors": 0,
       "skipped": 0
@@ -65,23 +91,31 @@
     {
       "suite": "dev.assetplatform.worker.AssetInspectorTest",
       "tests": 5,
+      "passed": 5,
       "failures": 0,
       "errors": 0,
       "skipped": 0
     },
     {
       "suite": "dev.assetplatform.integration.ContainerPlatformIT",
-      "tests": 19,
+      "tests": 30,
+      "passed": 0,
       "failures": 0,
       "errors": 0,
-      "skipped": 19
+      "skipped": 30
     },
     {
       "suite": "dev.assetplatform.integration.LocalPlatformIT",
-      "tests": 18,
+      "tests": 30,
+      "passed": 30,
       "failures": 0,
       "errors": 0,
       "skipped": 0
     }
-  ]
+  ],
+  "benchmarkDriverTests": {
+    "note": "Protocol fixtures only; not a platform benchmark",
+    "passed": 3,
+    "failed": 0
+  }
 }

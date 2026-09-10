@@ -26,7 +26,8 @@ public class BodyLimitFilter extends OncePerRequestFilter {
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain chain)
       throws ServletException, IOException {
-    if (!request.getRequestURI().startsWith("/api/v1/auth/")) {
+    String path = RequestPaths.applicationPath(request);
+    if (!path.startsWith("/api/v1/auth/")) {
       chain.doFilter(request, response);
       return;
     }

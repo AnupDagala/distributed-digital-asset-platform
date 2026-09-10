@@ -22,6 +22,9 @@ spring:
   jackson:
     deserialization:
       fail-on-unknown-properties: true
+      fail-on-trailing-tokens: true
+    parser:
+      strict-duplicate-detection: true
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -68,7 +71,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus
+        include: health,prometheus
   endpoint:
     health:
       show-details: never

@@ -27,6 +27,8 @@ jobs:
         run: |
           mvn -B -ntp org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree -Dscope=runtime -DoutputType=json -DoutputFile=target/dependency-tree.json
           node scripts/audit-dependencies.mjs
+      - name: Check benchmark driver verdicts
+        run: node --test benchmarks/load.test.mjs
       - name: Scan source for secrets
         run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 dir /repo --config /repo/.gitleaks.toml --redact --no-banner
       - name: Validate Compose and build application image

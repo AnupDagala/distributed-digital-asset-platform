@@ -8,6 +8,7 @@ import java.io.*;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.*;
 
@@ -39,7 +40,7 @@ public class ProcessingTransactions {
     this.metrics = metrics;
   }
 
-  @Transactional(timeout = 30)
+  @Transactional(timeout = 30, propagation = Propagation.REQUIRES_NEW)
   public boolean start(ProcessingRequest event) {
     Asset asset = assets.lockById(event.assetId()).orElseThrow(InvalidEventException::new);
     AssetProcessingJob job = verifiedJob(event);
@@ -51,7 +52,7 @@ public class ProcessingTransactions {
     return true;
   }
 
-  @Transactional(timeout = 120)
+  @Transactional(timeout = 120, propagation = Propagation.REQUIRES_NEW)
   public void process(ProcessingRequest event) {
     Asset asset = assets.lockById(event.assetId()).orElseThrow(InvalidEventException::new);
     AssetProcessingJob job = verifiedJob(event);
@@ -85,7 +86,14 @@ public class ProcessingTransactions {
     }
   }
 
-  @Transactional(timeout = 30)
+  @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
+  public boolean pending(ProcessingRequest event) {
+    Asset asset = assets.findById(event.assetId()).orElseThrow(InvalidEventException::new);
+    verifiedJob(event);
+    return asset.getDeletedAt() == null && !asset.getStatus().terminal();
+  }
+
+  @Transactional(timeout = 30, propagation = Propagation.REQUIRES_NEW)
   public void fail(ProcessingRequest event) {
     Asset asset = assets.lockById(event.assetId()).orElseThrow(InvalidEventException::new);
     AssetProcessingJob job = verifiedJob(event);

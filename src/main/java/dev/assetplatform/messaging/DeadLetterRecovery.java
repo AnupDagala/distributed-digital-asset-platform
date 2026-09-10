@@ -1,7 +1,7 @@
 package dev.assetplatform.messaging;
 
 import dev.assetplatform.config.PlatformProperties;
-import dev.assetplatform.worker.ProcessingTransactions;
+import dev.assetplatform.worker.ProcessingCoordinator;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -15,42 +15,36 @@ public class DeadLetterRecovery {
   private final KafkaTemplate<String, String> kafka;
   private final PlatformProperties props;
   private final EventCodec codec;
-  private final ProcessingTransactions transactions;
+  private final ProcessingCoordinator coordinator;
   private final MeterRegistry metrics;
 
   public DeadLetterRecovery(
       KafkaTemplate<String, String> kafka,
       PlatformProperties props,
       EventCodec codec,
-      ProcessingTransactions transactions,
+      ProcessingCoordinator coordinator,
       MeterRegistry metrics) {
     this.kafka = kafka;
     this.props = props;
     this.codec = codec;
-    this.transactions = transactions;
+    this.coordinator = coordinator;
     this.metrics = metrics;
   }
 
   public void recover(ConsumerRecord<?, ?> record, Exception failure) {
+    // A busy delivery has not attempted processing. Do not quarantine or fail its active peer.
+    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      if (cause instanceof ProcessingBusyException) throw new ProcessingBusyException();
+    }
     String payload = (String) record.value();
     String key = (String) record.key();
-    try {
-      kafka
-          .send(props.deadLetterTopic(), record.partition(), key, payload)
-          .get(20, TimeUnit.SECONDS);
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Recovery interrupted", ex);
-    } catch (Exception ex) {
-      throw new IllegalStateException("Dead-letter publish failed", ex);
-    }
     boolean invalid = false;
     try {
       ProcessingRequest event = codec.decode(payload);
       if (!event.assetId().toString().equals(key)) throw new InvalidEventException();
-      transactions.fail(event);
+      if (!coordinator.recover(event, () -> publish(record, key, payload))) return;
     } catch (InvalidEventException ex) {
-      // Malformed or unrelated messages cannot be allowed to fail an arbitrary asset.
+      publish(record, key, payload);
       invalid = true;
     }
     metrics
@@ -62,5 +56,18 @@ public class DeadLetterRecovery {
         record.partition(),
         record.offset(),
         failure.getClass().getSimpleName());
+  }
+
+  private void publish(ConsumerRecord<?, ?> record, String key, String payload) {
+    try {
+      kafka
+          .send(props.deadLetterTopic(), record.partition(), key, payload)
+          .get(20, TimeUnit.SECONDS);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Recovery interrupted", ex);
+    } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException ex) {
+      throw new IllegalStateException("Dead-letter publish failed", ex);
+    }
   }
 }

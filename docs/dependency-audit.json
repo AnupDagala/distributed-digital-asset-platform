@@ -1,5 +1,5 @@
 {
-  "scannedAt": "2026-09-10T13:12:42.591Z",
+  "scannedAt": "2026-09-10T17:13:30.333Z",
   "source": "https://api.osv.dev/v1/querybatch",
   "scope": "Resolved Maven runtime dependencies; excludes container OS packages and build/test tooling",
   "packagesScanned": 124,

@@ -5,7 +5,7 @@ import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.assetplatform.TestProperties;
-import dev.assetplatform.worker.ProcessingTransactions;
+import dev.assetplatform.worker.ProcessingCoordinator;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.file.Path;
 import java.util.UUID;
@@ -18,7 +18,7 @@ class DeadLetterRecoveryTest {
   @SuppressWarnings("unchecked")
   private final KafkaTemplate<String, String> kafka = mock(KafkaTemplate.class);
 
-  private final ProcessingTransactions transactions = mock(ProcessingTransactions.class);
+  private final ProcessingCoordinator coordinator = mock(ProcessingCoordinator.class);
   private final ObjectMapper mapper = new ObjectMapper();
 
   private DeadLetterRecovery recovery() {
@@ -26,7 +26,7 @@ class DeadLetterRecoveryTest {
         kafka,
         TestProperties.at(Path.of("target")),
         new EventCodec(mapper),
-        transactions,
+        coordinator,
         new SimpleMeterRegistry());
   }
 
@@ -39,7 +39,7 @@ class DeadLetterRecoveryTest {
                 recovery()
                     .recover(new ConsumerRecord<>("in", 0, 1, "x", "{"), new RuntimeException()))
         .isInstanceOf(IllegalStateException.class);
-    verifyNoInteractions(transactions);
+    verifyNoInteractions(coordinator);
   }
 
   @Test
@@ -47,7 +47,7 @@ class DeadLetterRecoveryTest {
     when(kafka.send(anyString(), anyInt(), any(), anyString()))
         .thenReturn(CompletableFuture.completedFuture(null));
     recovery().recover(new ConsumerRecord<>("in", 0, 1, "x", "{"), new InvalidEventException());
-    verifyNoInteractions(transactions);
+    verifyNoInteractions(coordinator);
   }
 
   @Test
@@ -55,13 +55,42 @@ class DeadLetterRecoveryTest {
     var event = new ProcessingRequest(1, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
     when(kafka.send(anyString(), anyInt(), any(), anyString()))
         .thenReturn(CompletableFuture.completedFuture(null));
+    when(coordinator.recover(eq(event), any()))
+        .thenAnswer(
+            call -> {
+              call.getArgument(1, Runnable.class).run();
+              return true;
+            });
     recovery()
         .recover(
             new ConsumerRecord<>(
                 "in", 0, 1, event.assetId().toString(), mapper.writeValueAsString(event)),
             new RuntimeException());
-    var order = inOrder(kafka, transactions);
-    order.verify(kafka).send(anyString(), anyInt(), any(), anyString());
-    order.verify(transactions).fail(event);
+    verify(coordinator).recover(eq(event), any());
+    verify(kafka).send(anyString(), anyInt(), any(), anyString());
+  }
+
+  @Test
+  void busyDeliveryCannotFailOrQuarantineItsActivePeer() {
+    assertThatThrownBy(
+            () ->
+                recovery()
+                    .recover(
+                        new ConsumerRecord<>("in", 0, 1, "x", "{"),
+                        new RuntimeException(new ProcessingBusyException())))
+        .isInstanceOf(ProcessingBusyException.class);
+    verifyNoInteractions(coordinator, kafka);
+  }
+
+  @Test
+  void completedDeliveryDoesNotPublishMisleadingDeadLetter() throws Exception {
+    var event = new ProcessingRequest(1, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+    recovery()
+        .recover(
+            new ConsumerRecord<>(
+                "in", 0, 1, event.assetId().toString(), mapper.writeValueAsString(event)),
+            new RuntimeException());
+    verify(coordinator).recover(eq(event), any());
+    verifyNoInteractions(kafka);
   }
 }

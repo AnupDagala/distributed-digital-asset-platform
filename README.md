@@ -1,14 +1,19 @@
 # Distributed Digital Asset Processing Platform
 
-## Overview
-
 A Java 21 backend for authenticated JPEG, PNG and PDF uploads, durable Kafka processing, metadata extraction and replayable status events. It focuses on correctness under concurrency and partial failure: an accepted upload has a database receipt, one processing job and a transactional outbox event.
 
 This is a portfolio implementation with a local deployment configuration, not a claim of production operation. Read [verification results](docs/VERIFICATION.md) for what was actually executed and what remains unverified.
 
-## Why I Built This
+## Engineering Highlights
 
-To make backend engineering decisions inspectable: who owns a request, which transaction establishes an invariant, what survives a process crash, and which tests demonstrate the intended behavior. The interesting work is in consistency and failure handling around file processing, beyond CRUD endpoints.
+- **Transactional outbox:** atomic acceptance, concurrent relay polling, durable publish retries and tested recovery from a rollback after broker acknowledgement.
+- **Concurrency controls:** owner-scoped request idempotency and SHA-256 content deduplication, database constraints, pessimistic aggregate locks and optimistic versions.
+- **Duplicate-safe workers:** a database advisory lock spans independently committed start/result transactions; overlapping deliveries do not spend the active worker's retry budget.
+- **Secure REST boundaries:** JWT ownership, salted password hashes, strict JSON and upload validation, shared Redis rate limits and operator-scoped metrics.
+- **Streaming algorithms:** fixed-buffer hashing and KMP PDF marker matching; metadata parsing remains off the request path.
+- **Executable evidence:** real PostgreSQL/Kafka integration tests, Testcontainers contract, fault injection, CI and a reproducible benchmark driver.
+
+**Start locally:** `node scripts/init-local-env.mjs`, then `docker compose up --build --wait` and `node scripts/smoke.mjs`. See [Running Locally](#running-locally) for prerequisites. [Current verification](docs/VERIFICATION.md) distinguishes executed checks from Docker limitations. [Engineering review](docs/REVIEW.md) explains the hardening decisions; [role evidence](docs/ADOBE_ROLE_ALIGNMENT.md) maps implemented skills and remaining gaps.
 
 ## Architecture
 
@@ -65,7 +70,7 @@ Events contain a schema version and UUIDs for the event, asset and job. Consumer
 
 The asset, job, initial event and processing outbox row commit together. Relays select due rows with FOR UPDATE SKIP LOCKED. A crash between broker acknowledgement and database commit can publish a duplicate, which the worker tolerates. Broker outages leave rows pending with capped exponential backoff; outbox retries are durable and not abandoned after a fixed count. Worker delivery retries are separately bounded.
 
-The database transaction holds a connection during a bounded publish wait or processing operation. That explicit throughput trade-off is described in [architecture](docs/ARCHITECTURE.md).
+The relay holds a database connection during the broker wait. Worker coordination uses one connection for the advisory lock and another for the current start/result transaction. Parser resource limits do not constitute a hard wall-clock timeout. These throughput and isolation trade-offs are described in [architecture](docs/ARCHITECTURE.md).
 
 ## Idempotency vs Content Deduplication
 
@@ -75,7 +80,7 @@ The database transaction holds a connection during a bounded publish wait or pro
 
 ## Security
 
-Salted PBKDF2 password hashes, 15-minute signed JWTs with issuer/audience/expiry checks, server-side ownership, safe errors, strict filenames, file signatures, streaming limits and Redis rate limits are implemented. Swagger is opt-in; health has no details; metrics require authentication; other actuator endpoints are blocked. No wildcard CORS is configured.
+Salted PBKDF2 password hashes, 15-minute signed JWTs with issuer/audience/expiry checks, server-side ownership, safe errors, strict JSON, filenames, file signatures, streaming limits and Redis rate limits are implemented. Swagger is opt-in; health has no details; metrics require the `metrics.read` scope, which ordinary login tokens do not receive; other actuator endpoints are blocked. No wildcard CORS is configured.
 
 Compose binds only the application port to loopback. It is a local environment: TLS termination, Kafka authentication, tenant storage quotas, parser process isolation, key rotation and operational retention policies are required before an Internet-facing deployment. See [SECURITY.md](SECURITY.md) and the [threat model](docs/THREAT_MODEL.md).
 
@@ -95,9 +100,9 @@ Actual outcomes are recorded in [docs/VERIFICATION.md](docs/VERIFICATION.md). Co
 
 ## Observability
 
-Logs are structured JSON and HTTP responses carry X-Request-ID. Workers log event and asset IDs, not file bodies or tokens. Metrics include asset_upload_total (created/replayed), asset_processing_total (terminal status), asset_processing_duration_seconds (delivery duration), asset_outbox_publish_total, asset_deadletter_total and asset_rate_limit_total. Labels have bounded cardinality; no user or asset ID appears as a metric label.
+Logs are structured JSON and HTTP responses carry X-Request-ID. Workers log event and asset IDs, not file bodies or tokens. Metrics include asset_upload_total (created/replayed), asset_processing_total (committed terminal status), asset_processing_duration_seconds (delivery attempts, including duplicate/no-op and failed attempts), asset_outbox_publish_total (committed relay outcomes, including object cleanup), asset_outbox_transaction_failures_total, asset_deadletter_total and asset_rate_limit_total. Labels have bounded cardinality; no user or asset ID appears as a metric label.
 
-GET /actuator/health exposes aggregate database/Redis/disk health without details; it is not a guarantee of Kafka delivery or parser availability. GET /actuator/prometheus requires a bearer token. In a shared deployment, restrict metrics further at the gateway. Alert on sustained outbox retries, failed/dead-letter processing, database health, object-volume capacity and event backlog.
+GET /actuator/health exposes aggregate database/Redis/disk health without details; it is not a guarantee of Kafka delivery or parser availability. GET /actuator/prometheus requires a trusted issuer's bearer token with `scope: metrics.read`; self-registration cannot grant this scope. Scraper credential provisioning remains an operator task; restrict management access at the gateway as well. Alert on sustained outbox retries, failed/dead-letter processing, database health and object-volume capacity. Outbox backlog/age gauges and cross-service tracing remain gaps.
 
 ## API
 
@@ -160,6 +165,7 @@ benchmarks/  reproducible HTTP load driver and fixture
 | Crash after publish, before marking outbox | Same event may be published again; terminal-state guards prevent repeat effects |
 | Worker crash after PROCESSING | Final transaction rolls back; a subsequent delivery can restart processing |
 | Duplicate event | Verified job and locked terminal state make it a no-op |
+| Overlapping delivery before the result transaction | Advisory lock returns a retryable contention error; no attempt increment or DLT publication |
 | Temporary processing I/O failure | Initial delivery plus three retries, one second apart; persisted job budget also bounds restarts |
 | Retry exhaustion | Publish to DLT, then mark correlated job FAILED; recovery failure prevents acknowledgement |
 | Invalid content | REJECTED without retry; no canonical content fingerprint |

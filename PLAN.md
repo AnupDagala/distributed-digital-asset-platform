@@ -13,15 +13,15 @@
 - PostgreSQL owns durable state. Outbox delivery and Kafka consumption are at least once.
 - Idempotency keys are scoped to authenticated owners and persist independently of asset deletion.
 - Object bytes are streamed to immutable UUID keys before the asset transaction. Failed transactions clean up best effort; a crash can leave an orphan, documented for operators.
-- Workers serialize on the asset row while performing bounded file inspection. A separate committed start transition makes PROCESSING observable and permits crash recovery without a lease.
+- Workers use a transaction-scoped advisory lock across the separate start/result transactions and an asset row lock during inspection. PROCESSING remains observable and starts survive crashes; active delivery uses two database connections. Parser execution still needs external resource isolation.
 - SSE reads durable processing events with Last-Event-ID; Redis is an atomic distributed rate limiter, not an authority for asset state.
 - The local storage adapter uses a shared volume; API and worker roles can run in separate processes with access to that volume. A storage interface isolates business logic from the adapter.
 - The algorithm component is streaming KMP matching for PDF end-marker validation, preserving linear time across arbitrary stream chunk boundaries.
 
-## Environment discovered
+## Initial environment
 
-Windows; system Java 17 and Git available. Java 21 and Maven will be bootstrapped into the parent workspace. Docker and GitHub CLI are not on PATH. No application repository or existing files were present.
+The initial implementation began on Windows with system Java 17 and Git. Portable Java 21 and Maven were installed in the parent workspace. Docker's daemon remains unavailable. The source was subsequently committed and pushed to the configured GitHub repository.
 
 ## Outcome
 
-Implementation phases completed. The final clean build passed with 59 tests passed and 19 container-only cases skipped. The runtime dependency audit and source secret scan passed. Docker engine execution, benchmark measurement and GitHub publication remain unverified or blocked as detailed in docs/VERIFICATION.md. Git commit is pending the requested author identity.
+Implementation and a subsequent in-place hardening review are complete. [Current verification](docs/VERIFICATION.md) records executed test/security checks and Docker limitations; [review findings](docs/REVIEW.md) explain the changes and remaining gaps. The initial published commit is a4eb32c099eb9f34eae5a5c72ffa2aa183f53862. Git history records later changes; this planning document is not the source of current test counts.
