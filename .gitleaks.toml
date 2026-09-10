@@ -1,0 +1,6 @@
+title = "Source secret scan"
+[extend]
+useDefault = true
+[allowlist]
+description = "Ignore generated artifacts and ephemeral test reports"
+paths = ['''(^|/)target/''']

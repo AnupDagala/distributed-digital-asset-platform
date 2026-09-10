@@ -1,0 +1,100 @@
+spring:
+  application:
+    name: distributed-digital-asset-platform
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/assets}
+    username: ${DATABASE_USER}
+    password: ${DATABASE_PASSWORD}
+    hikari:
+      maximum-pool-size: 16
+      connection-timeout: 5000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 21MB
+      file-size-threshold: 0
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      connect-timeout: 2s
+      timeout: 2s
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        delivery.timeout.ms: 15000
+        request.timeout.ms: 5000
+        max.block.ms: 5000
+    consumer:
+      group-id: asset-processors-v1
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      max-poll-records: 1
+      properties:
+        max.poll.interval.ms: 300000
+    listener:
+      ack-mode: record
+      concurrency: ${WORKER_CONCURRENCY:2}
+      auto-startup: ${WORKER_ENABLED:true}
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+server:
+  shutdown: graceful
+  forward-headers-strategy: none
+  tomcat:
+    max-http-form-post-size: 21MB
+    max-swallow-size: 21MB
+  error:
+    include-message: never
+    include-stacktrace: never
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+logging:
+  structured:
+    format:
+      console: logstash
+platform:
+  storage-root: ${STORAGE_ROOT:./data/objects}
+  max-file-bytes: ${MAX_FILE_BYTES:20971520}
+  max-image-pixels: ${MAX_IMAGE_PIXELS:16000000}
+  jwt-secret: ${JWT_SECRET}
+  jwt-issuer: digital-asset-platform
+  token-ttl: 15m
+  requests-per-minute: ${REQUESTS_PER_MINUTE:120}
+  auth-requests-per-minute: ${AUTH_REQUESTS_PER_MINUTE:10}
+  rate-window: 60s
+  processing-topic: assets.processing.v1
+  dead-letter-topic: assets.processing.v1.dlt
+  kafka-partitions: 3
+  outbox-enabled: ${OUTBOX_ENABLED:true}
+  sse-max-connections: 100
+springdoc:
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${API_DOCS_ENABLED:false}

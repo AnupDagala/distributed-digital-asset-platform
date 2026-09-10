@@ -1,0 +1,87 @@
+{
+  "command": "mvn clean verify",
+  "build": "SUCCESS",
+  "discovered": 78.0,
+  "passed": 59.0,
+  "failed": 0.0,
+  "skipped": 19.0,
+  "suites": [
+    {
+      "suite": "dev.assetplatform.domain.AssetTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "dev.assetplatform.messaging.DeadLetterRecoveryTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "dev.assetplatform.messaging.EventCodecTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "dev.assetplatform.security.OwnershipTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "dev.assetplatform.security.RateLimitFilterTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "dev.assetplatform.storage.LocalObjectStorageTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "dev.assetplatform.validation.FileValidatorTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "dev.assetplatform.validation.StreamingPatternMatcherTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "dev.assetplatform.worker.AssetInspectorTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "dev.assetplatform.integration.ContainerPlatformIT",
+      "tests": 19,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 19
+    },
+    {
+      "suite": "dev.assetplatform.integration.LocalPlatformIT",
+      "tests": 18,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ]
+}
