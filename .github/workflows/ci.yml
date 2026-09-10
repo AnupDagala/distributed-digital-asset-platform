@@ -41,7 +41,7 @@ jobs:
       - name: Stop smoke environment
         if: always()
         run: docker compose --env-file .env.example down --volumes
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: verification-reports
